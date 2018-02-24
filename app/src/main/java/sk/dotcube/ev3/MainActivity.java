@@ -32,11 +32,11 @@ public class MainActivity extends AppCompatActivity
     private ImageButton forward, backward, left, right;
     public static final String HOST = "10.40.50.30";
     private RemoteRequestEV3 ev3;
-    //private RemoteRequestPilot pilot;
-    Wheel leftWheel = WheeledChassis.modelWheel(Motor.A, 42.2).offset(72).gearRatio(2);
+    private RemoteRequestPilot pilot;
+    /*Wheel leftWheel = WheeledChassis.modelWheel(Motor.A, 42.2).offset(72).gearRatio(2);
     Wheel rightWheel = WheeledChassis.modelWheel(Motor.B, 42.2).offset(-72).gearRatio(2);
     Chassis myChassis = new WheeledChassis( new Wheel[]{leftWheel, rightWheel}, WheeledChassis.TYPE_DIFFERENTIAL);
-    MovePilot pilot = new MovePilot(myChassis);
+    MovePilot pilot = new MovePilot(myChassis);*/
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -156,7 +156,7 @@ public class MainActivity extends AppCompatActivity
             if (cmd[0].equals("connect")) {
                 try {
                     ev3 = new RemoteRequestEV3(cmd[1]);
-                    //pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f,"A", "B");
+                    pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f,"A", "B");
                     pilot.setLinearSpeed(20);
                 } catch (IOException e) {
                     return 1l;
