@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/arrow_control"
+            android:icon="@drawable/ic_arrow_all_white_48dp"
+            android:title="Arrow Control" />
+
+        <item
+            android:id="@+id/gyro_control"
+            android:icon="@drawable/ic_crop_rotate_white_48dp"
+            android:title="Gyroscope Control" />
+
+        <item
+            android:id="@+id/settings"
+            android:icon="@drawable/ic_menu_manage"
+            android:title="Settings" />
+    </group>
+
+    <item android:title="Info">
+        <menu>
+            <item
+                android:id="@+id/nav_share"
+                android:icon="@drawable/ic_menu_share"
+                android:title="LEGO" />
+            <item
+                android:id="@+id/nav_send"
+                android:icon="@drawable/ic_menu_send"
+                android:title="About me" />
+        </menu>
+    </item>
+
+</menu>

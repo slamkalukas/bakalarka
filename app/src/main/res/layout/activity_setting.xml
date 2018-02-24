@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="sk.dotcube.ev3.SettingActivity">
+
+    <EditText
+        android:id="@+id/EV3IPAddress"
+        android:layout_width="359dp"
+        android:layout_height="41dp"
+        android:layout_marginLeft="13dp"
+        android:layout_marginTop="8dp"
+        android:contentDescription="IP address of EV3"
+        android:ems="10"
+        android:inputType="text"
+        android:text="10.40.50.31"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+</android.support.constraint.ConstraintLayout>
