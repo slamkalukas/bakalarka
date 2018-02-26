@@ -1,6 +1,10 @@
 package sk.dotcube.ev3;
 
 import android.content.Intent;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.design.widget.NavigationView;
@@ -17,26 +21,20 @@ import android.widget.ImageButton;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.Objects;
 
-import lejos.hardware.motor.Motor;
 import lejos.remote.ev3.RemoteRequestEV3;
 import lejos.remote.ev3.RemoteRequestPilot;
-import lejos.robotics.chassis.Chassis;
-import lejos.robotics.chassis.Wheel;
-import lejos.robotics.chassis.WheeledChassis;
-import lejos.robotics.navigation.MovePilot;
+import lejos.utility.Delay;
 
 public class MainActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener, OnTouchListener {
+        implements NavigationView.OnNavigationItemSelectedListener, OnTouchListener, SensorEventListener {
 
     private ImageButton forward, backward, left, right;
     public static final String HOST = "10.40.50.30";
     private RemoteRequestEV3 ev3;
     private RemoteRequestPilot pilot;
-    /*Wheel leftWheel = WheeledChassis.modelWheel(Motor.A, 42.2).offset(72).gearRatio(2);
-    Wheel rightWheel = WheeledChassis.modelWheel(Motor.B, 42.2).offset(-72).gearRatio(2);
-    Chassis myChassis = new WheeledChassis( new Wheel[]{leftWheel, rightWheel}, WheeledChassis.TYPE_DIFFERENTIAL);
-    MovePilot pilot = new MovePilot(myChassis);*/
+    private SensorManager sensorManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,6 +51,11 @@ public class MainActivity extends AppCompatActivity
 
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
+
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        sensorManager.registerListener(MainActivity.this,
+                sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+                SensorManager.SENSOR_DELAY_NORMAL);
 
         new Control().execute("connect", HOST);
 
@@ -86,10 +89,46 @@ public class MainActivity extends AppCompatActivity
             @Override
             public void onClick(View v) {
                 // TODO Auto-generated method stub
-                new Control().execute("connect", HOST);
+                new Control().execute("close", HOST);
             }
         });*/
 
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        // Do nothing
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        String direction = "stop";
+        float x = event.values[0];
+        float y = event.values[1];
+        
+        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+
+            if (x > y)
+                if (x > 0f)
+                    direction = "left";
+                else direction = "right";
+            if (y > x)
+                if (y > 0f)
+                    direction = "forward";
+                else direction = "backward";
+
+            if (Objects.equals(direction, "forward"))
+                new Control().execute("forward");
+            else if (Objects.equals(direction, "backward"))
+                new Control().execute("backward");
+            else if (Objects.equals(direction, "left"))
+                new Control().execute("left");
+            else if (Objects.equals(direction, "right"))
+                new Control().execute("right");
+            else if (Objects.equals(direction, "stop"))
+                new Control().execute("stop");
+            
+        }
     }
 
     @Override
@@ -153,50 +192,57 @@ public class MainActivity extends AppCompatActivity
 
     public class Control extends AsyncTask<String, Integer, Long> {
         protected Long doInBackground(String... cmd) {
-            if (cmd[0].equals("connect")) {
-                try {
-                    ev3 = new RemoteRequestEV3(cmd[1]);
-                    pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f,"A", "B");
-                    pilot.setLinearSpeed(20);
-                } catch (IOException e) {
-                    return 1l;
-                }
-            } else if (cmd[0].equals("left")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.rotateLeft();
-            } else if (cmd[0].equals("right")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.rotateRight();
-            } else if (cmd[0].equals("backward")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.travel(50);
-                pilot.rotate(-90);
-                pilot.travel(100);
-            } else if (cmd[0].equals("forward")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.backward();
-            } else if (cmd[0].equals("stop")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.stop();
-            } else if (cmd[0].equals("close")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.stop();
-                ev3.disConnect();
+            switch (cmd[0]) {
+                case "connect":
+                    try {
+                        ev3 = new RemoteRequestEV3(cmd[1]);
+                        pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f, "A", "B");
+                        pilot.setLinearSpeed(20f);
+                    } catch (IOException e) {
+                        return 1L;
+                    }
+                    break;
+                case "left":
+                    if (ev3 == null)
+                        return 2L;
+                    pilot.rotateLeft();
+                    break;
+                case "right":
+                    if (ev3 == null)
+                        return 2L;
+                    pilot.rotateRight();
+                    break;
+                case "backward":
+                    if (ev3 == null)
+                        return 2L;
+                    pilot.forward();
+                    break;
+                case "forward":
+                    if (ev3 == null)
+                        return 2L;
+                    pilot.backward();
+                    break;
+                case "stop":
+                    if (ev3 == null)
+                        return 2L;
+                    pilot.stop();
+                    break;
+                case "close":
+                    if (ev3 == null)
+                        return 2L;
+                    pilot.stop();
+                    pilot.close();
+                    ev3.disConnect();
+                    break;
             }
-            return 0l;
+            return 0L;
         }
 
         protected void onPostExecute(Long result) {
-            if (result == 1l)
+            if (result == 1L)
                 Toast.makeText(MainActivity.this, "Could not connect to EV3",
                         Toast.LENGTH_LONG).show();
-            else if (result == 2l)
+            else if (result == 2L)
                 Toast.makeText(MainActivity.this, "Not connected",
                         Toast.LENGTH_LONG).show();
         }
