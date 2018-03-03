@@ -1,6 +1,10 @@
 package sk.dotcube.ev3;
 
 import android.content.Intent;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.design.widget.NavigationView;
@@ -13,30 +17,48 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnTouchListener;
+import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
 
-import lejos.hardware.motor.Motor;
+import lejos.hardware.Brick;
+import lejos.hardware.BrickFinder;
+import lejos.hardware.Keys;
+import lejos.hardware.port.SensorPort;
+import lejos.hardware.sensor.EV3ColorSensor;
+import lejos.hardware.sensor.EV3TouchSensor;
+import lejos.remote.ev3.RMISampleProvider;
+import lejos.remote.ev3.RemoteEV3;
 import lejos.remote.ev3.RemoteRequestEV3;
 import lejos.remote.ev3.RemoteRequestPilot;
-import lejos.robotics.chassis.Chassis;
-import lejos.robotics.chassis.Wheel;
-import lejos.robotics.chassis.WheeledChassis;
-import lejos.robotics.navigation.MovePilot;
+import lejos.robotics.Color;
+import lejos.robotics.ColorIdentifier;
+import lejos.robotics.SampleProvider;
+import lejos.robotics.filter.PublishedSource;
+import lejos.robotics.filter.SubscribedProvider;
+import lejos.utility.Delay;
 
 public class MainActivity extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener, OnTouchListener {
+        implements NavigationView.OnNavigationItemSelectedListener, OnTouchListener, SensorEventListener {
 
     private ImageButton forward, backward, left, right;
     public static final String HOST = "10.40.50.30";
     private RemoteRequestEV3 ev3;
     private RemoteRequestPilot pilot;
-    /*Wheel leftWheel = WheeledChassis.modelWheel(Motor.A, 42.2).offset(72).gearRatio(2);
-    Wheel rightWheel = WheeledChassis.modelWheel(Motor.B, 42.2).offset(-72).gearRatio(2);
-    Chassis myChassis = new WheeledChassis( new Wheel[]{leftWheel, rightWheel}, WheeledChassis.TYPE_DIFFERENTIAL);
-    MovePilot pilot = new MovePilot(myChassis);*/
+    private SensorManager sensorManager;
+    private Sensor mTouch;
+    private float x = 0, y = 0, z = 0;
+    private SampleProvider colourSP, ultrasonicDistSP;
+    private TextView xAccel, yAccel, zAccel;
+    private Brick evBrick;
+    private EV3ColorSensor cSensor;
+    private float[] colourSample, ultrasonicDistSample;
+    private int colourData = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,7 +76,12 @@ public class MainActivity extends AppCompatActivity
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
-        new Control().execute("connect", HOST);
+        sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
+        mTouch = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+        xAccel = (TextView) findViewById(R.id.xAccel);
+        yAccel = (TextView) findViewById(R.id.yAccel);
+        zAccel = (TextView) findViewById(R.id.zAccel);
 
         //EV3 code part
 
@@ -70,26 +97,47 @@ public class MainActivity extends AppCompatActivity
         right = (ImageButton) findViewById(R.id.btnRight);
         right.setOnTouchListener(this);
 
-        /*Button connButton = (Button) findViewById(R.id.EV3connect);
-        connButton.setOnClickListener( new OnClickListener() {
+        new Control2().execute("connect");
 
+        /*Button connButton = (Button) findViewById(R.id.EV3connect);
+        connButton.setOnClickListener( new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // TODO Auto-generated method stub
+                try {
+                    ev32 = new RemoteRequestEV3(HOST);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                SampleProvider sensor = ev32.createSampleProvider("S1", "lejos.hardware.sensor.EV3ColorSensor", "Color ID");
+                float[] color_id= new float[1];
+                sensor.fetchSample(color_id, 0);
+                System.out.println("Here is color id: " + color_id);
+            }
+        });*/
+
+        Button connButton = (Button) findViewById(R.id.EV3connect);
+        connButton.setOnClickListener( new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Control2().execute("color");
+            }
+        });
+
+        Button connButton1 = (Button) findViewById(R.id.EV3connect2);
+        connButton1.setOnClickListener( new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
                 new Control().execute("connect", HOST);
             }
         });
 
-        Button disconnButton = (Button) findViewById(R.id.EV3disconnect);
-        disconnButton.setOnClickListener( new OnClickListener() {
 
-            @Override
-            public void onClick(View v) {
-                // TODO Auto-generated method stub
-                new Control().execute("connect", HOST);
-            }
-        });*/
+    }
 
+    protected void onResume() {
+        sensorManager.registerListener(this, mTouch, SensorManager.SENSOR_DELAY_NORMAL);
+        super.onResume();
     }
 
     @Override
@@ -151,43 +199,134 @@ public class MainActivity extends AppCompatActivity
                 Toast.LENGTH_SHORT).show();
     }
 
-    public class Control extends AsyncTask<String, Integer, Long> {
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        synchronized (this) {
+            if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+                x = event.values[0];
+                y = event.values[1];
+                z = event.values[2];
+                xAccel.setText("x = " + x);
+                yAccel.setText("y = " + y);
+                zAccel.setText("z = " + z);
+            } else {
+                xAccel.setText("NEFUNGUJE!");
+            }
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+    }
+
+    private void setupColorSensor() {
+        cSensor = new EV3ColorSensor(evBrick.getPort("S1"));
+        colourSP = cSensor.getRGBMode();
+        colourSample = new float[colourSP.sampleSize()];
+        colourData = cSensor.getColorID();
+    }
+
+    /* sensor methods */
+
+    // get raw data from the color sensor (RGB mode)
+    private float[] getRawColorData() {
+        colourSP.fetchSample(colourSample, 0);
+        return colourSample;
+    }
+
+    private String getRGBData() {
+        float[] colorData = getRawColorData();
+        float r = colorData[0];
+        float g = colorData[1];
+        float b = colorData[2];
+        return "r " + r*100 + " g " + g*100 + " b " +b*100;
+    }
+
+    private class Control2 extends AsyncTask<String, Integer, Long> {
+
+        private int numSamples = 0;
         protected Long doInBackground(String... cmd) {
             if (cmd[0].equals("connect")) {
                 try {
-                    ev3 = new RemoteRequestEV3(cmd[1]);
-                    pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f,"A", "B");
-                    pilot.setLinearSpeed(20);
+                    evBrick = new RemoteRequestEV3(HOST);
+                    setupColorSensor();
                 } catch (IOException e) {
-                    return 1l;
+                    e.printStackTrace();
                 }
-            } else if (cmd[0].equals("left")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.rotateLeft();
-            } else if (cmd[0].equals("right")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.rotateRight();
-            } else if (cmd[0].equals("backward")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.travel(50);
-                pilot.rotate(-90);
-                pilot.travel(100);
-            } else if (cmd[0].equals("forward")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.backward();
-            } else if (cmd[0].equals("stop")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.stop();
-            } else if (cmd[0].equals("close")) {
-                if (ev3 == null)
-                    return 2l;
-                pilot.stop();
-                ev3.disConnect();
+                } else if (cmd[0].equals("color")) {
+                    Keys keys1 = evBrick.getKeys();
+                    do {
+                        int theColor = cSensor.getColorID();
+                        System.out.println("My color is " + theColor);
+                        Delay.msDelay(200);
+                    } while (keys1.getButtons() != lejos.hardware.Button.ID_LEFT);
+                    cSensor.close();
+                    return (long) numSamples;
+                } else if (cmd[0].equals("close")) {
+                    cSensor.close();
+                    return (long) numSamples;
+                }
+                return (long) numSamples;
+            }
+
+        protected void onPostExecute(Long result) {
+            Toast.makeText(MainActivity.this, "Number of samples: " + result,
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    public class Control extends AsyncTask<String, Integer, Long> {
+        protected Long doInBackground(String... cmd) {
+            switch (cmd[0]) {
+                case "connect":
+                    try {
+                        ev3 = new RemoteRequestEV3(cmd[1]);
+                        pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f, "B", "C");
+                        pilot.setLinearSpeed(30f);
+                    } catch (IOException e) {
+                        return 1l;
+                    }
+                    break;
+                case "left":
+                    if (ev3 == null)
+                        return 2l;
+                    pilot.rotateRight();
+                    break;
+                case "right":
+                    if (ev3 == null)
+                        return 2l;
+                    pilot.rotateLeft();
+                    break;
+                case "backward":
+                    if (ev3 == null)
+                        return 2l;
+                    pilot.forward();
+                    break;
+                case "forward":
+                    if (ev3 == null)
+                        return 2l;
+                    pilot.backward();
+                    break;
+                case "stop":
+                    if (ev3 == null)
+                        return 2l;
+                    pilot.stop();
+                    break;
+                case "bump":
+                    if (ev3 == null)
+                        return 2l;
+                    pilot.stop();
+                    pilot.travel(-20);
+                    pilot.rotate(180);
+                    pilot.travel(10);
+                    break;
+                case "close":
+                    if (ev3 == null)
+                        return 2l;
+                    pilot.stop();
+                    ev3.disConnect();
+                    break;
             }
             return 0l;
         }
