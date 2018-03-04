@@ -23,24 +23,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
 
-import lejos.hardware.Brick;
-import lejos.hardware.BrickFinder;
 import lejos.hardware.Keys;
-import lejos.hardware.port.SensorPort;
+import lejos.hardware.motor.Motor;
 import lejos.hardware.sensor.EV3ColorSensor;
-import lejos.hardware.sensor.EV3TouchSensor;
-import lejos.remote.ev3.RMISampleProvider;
-import lejos.remote.ev3.RemoteEV3;
+import lejos.hardware.sensor.EV3UltrasonicSensor;
 import lejos.remote.ev3.RemoteRequestEV3;
 import lejos.remote.ev3.RemoteRequestPilot;
-import lejos.robotics.Color;
-import lejos.robotics.ColorIdentifier;
 import lejos.robotics.SampleProvider;
-import lejos.robotics.filter.PublishedSource;
-import lejos.robotics.filter.SubscribedProvider;
 import lejos.utility.Delay;
 
 public class MainActivity extends AppCompatActivity
@@ -55,10 +45,17 @@ public class MainActivity extends AppCompatActivity
     private float x = 0, y = 0, z = 0;
     private SampleProvider colourSP, ultrasonicDistSP;
     private TextView xAccel, yAccel, zAccel;
-    private Brick evBrick;
+    private RemoteRequestEV3 evBrick;
     private EV3ColorSensor cSensor;
     private float[] colourSample, ultrasonicDistSample;
     private int colourData = 0;
+    private Button connButton1,connButton2;
+    private Boolean stop1,stop2 = false;
+    private EV3UltrasonicSensor uSensor;
+    private static final int SCAN_DELAY = 70;
+    private static final int REPEAT_SCAN_TIMES = 20;
+    private static final double SCAN_STABLE_THRESHOLD = 0.5;
+    private static final float OCCUPIED_THRESHOLD = 30;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,42 +94,37 @@ public class MainActivity extends AppCompatActivity
         right = (ImageButton) findViewById(R.id.btnRight);
         right.setOnTouchListener(this);
 
-        new Control2().execute("connect");
+        new Control().execute("connect", HOST);
 
-        /*Button connButton = (Button) findViewById(R.id.EV3connect);
-        connButton.setOnClickListener( new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                try {
-                    ev32 = new RemoteRequestEV3(HOST);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                SampleProvider sensor = ev32.createSampleProvider("S1", "lejos.hardware.sensor.EV3ColorSensor", "Color ID");
-                float[] color_id= new float[1];
-                sensor.fetchSample(color_id, 0);
-                System.out.println("Here is color id: " + color_id);
-            }
-        });*/
-
-        Button connButton = (Button) findViewById(R.id.EV3connect);
-        connButton.setOnClickListener( new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                new Control2().execute("color");
-            }
-        });
-
-        Button connButton1 = (Button) findViewById(R.id.EV3connect2);
+        connButton1 = (Button) findViewById(R.id.Color);
         connButton1.setOnClickListener( new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                new Control().execute("connect", HOST);
+                new Control().execute("color");
+            }
+        });
+        connButton1.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                stop1 = true;
+                return true;
             }
         });
 
-
+        connButton2 = (Button) findViewById(R.id.Distance);
+        connButton2.setOnClickListener( new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Control().execute("distance");
+            }
+        });
+        connButton2.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                stop2 = true;
+                return true;
+            }
+        });
     }
 
     protected void onResume() {
@@ -148,6 +140,67 @@ public class MainActivity extends AppCompatActivity
         } else {
             super.onBackPressed();
         }
+    }
+
+    // get one single distance (gurantee a non-INFINITY return)
+    private float getOneDistance() {
+        try {
+            Thread.sleep(SCAN_DELAY);
+        } catch (InterruptedException e) {
+            // this won't happen
+        }
+        // ask ultrasonic sensor for raw data
+        ultrasonicDistSP.fetchSample(ultrasonicDistSample, 0);
+        float distance = ultrasonicDistSample[0] * 100;
+        // if the distance is INIFINITY, try to move back or rotate a little bit
+        // to avoid it
+        int count = 1;
+        // repeat the following actions until a non-INIFINITY number is returned
+        while (Float.isInfinite(distance)) {
+            // move back and scan again
+            if (count == 1) {
+                pilot.travel(-1);
+                ultrasonicDistSP.fetchSample(ultrasonicDistSample, 0);
+                distance = ultrasonicDistSample[0] * 100;
+                count = -1;
+                // if moving back does not work, rotate one degree and scan
+                // again
+            } else if (count == -1) {
+                pilot.rotate(1);
+                ultrasonicDistSP.fetchSample(ultrasonicDistSample, 0);
+                distance = ultrasonicDistSample[0] * 100;
+                pilot.rotate(-1);
+                count = 1;
+            }
+        }
+        return distance;
+    }
+
+    // get a stable and accruate distance
+    private double getAccurateDistance() {
+        double average = 0;
+        while (true) {
+            // get a set of data by scanning and compute an average
+            average = 0;
+            float[] distances = new float[REPEAT_SCAN_TIMES];
+            for (int i = 0; i <= REPEAT_SCAN_TIMES - 1; i++) {
+                distances[i] = getOneDistance();
+                average += distances[i] / REPEAT_SCAN_TIMES;
+            }
+            // if each distance we got is close to the average, then this set of
+            // data is reliable
+            // if any distance in the data set is very different from the
+            // average, then this set
+            // of data will be considered unreliable and will be scanned again
+            for (int i = 0; i <= REPEAT_SCAN_TIMES - 1; i++) {
+                if (Math.abs(average - distances[i]) > SCAN_STABLE_THRESHOLD) {
+                    continue;
+                }
+            }
+            break;
+        }
+        System.out.println(average);
+        return average;
     }
 
     @SuppressWarnings("StatementWithEmptyBody")
@@ -221,10 +274,25 @@ public class MainActivity extends AppCompatActivity
     }
 
     private void setupColorSensor() {
-        cSensor = new EV3ColorSensor(evBrick.getPort("S1"));
-        colourSP = cSensor.getRGBMode();
-        colourSample = new float[colourSP.sampleSize()];
-        colourData = cSensor.getColorID();
+        try {
+            cSensor = new EV3ColorSensor(ev3.getPort("S1"));
+            colourSP = cSensor.getRGBMode();
+            colourSample = new float[colourSP.sampleSize()];
+        } catch (Exception e)
+        {
+            System.out.print(e);
+        }
+    }
+
+    private void setupUltrasonicSensor() {
+        try {
+            uSensor = new EV3UltrasonicSensor(ev3.getPort("S4"));
+            ultrasonicDistSP = uSensor.getDistanceMode();
+            ultrasonicDistSample = new float[ultrasonicDistSP.sampleSize()];
+        } catch (Exception e)
+        {
+            System.out.print(e);
+        }
     }
 
     /* sensor methods */
@@ -243,39 +311,6 @@ public class MainActivity extends AppCompatActivity
         return "r " + r*100 + " g " + g*100 + " b " +b*100;
     }
 
-    private class Control2 extends AsyncTask<String, Integer, Long> {
-
-        private int numSamples = 0;
-        protected Long doInBackground(String... cmd) {
-            if (cmd[0].equals("connect")) {
-                try {
-                    evBrick = new RemoteRequestEV3(HOST);
-                    setupColorSensor();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                } else if (cmd[0].equals("color")) {
-                    Keys keys1 = evBrick.getKeys();
-                    do {
-                        int theColor = cSensor.getColorID();
-                        System.out.println("My color is " + theColor);
-                        Delay.msDelay(200);
-                    } while (keys1.getButtons() != lejos.hardware.Button.ID_LEFT);
-                    cSensor.close();
-                    return (long) numSamples;
-                } else if (cmd[0].equals("close")) {
-                    cSensor.close();
-                    return (long) numSamples;
-                }
-                return (long) numSamples;
-            }
-
-        protected void onPostExecute(Long result) {
-            Toast.makeText(MainActivity.this, "Number of samples: " + result,
-                    Toast.LENGTH_LONG).show();
-        }
-    }
-
     public class Control extends AsyncTask<String, Integer, Long> {
         protected Long doInBackground(String... cmd) {
             switch (cmd[0]) {
@@ -284,6 +319,8 @@ public class MainActivity extends AppCompatActivity
                         ev3 = new RemoteRequestEV3(cmd[1]);
                         pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f, "B", "C");
                         pilot.setLinearSpeed(30f);
+                        setupColorSensor();
+                        setupUltrasonicSensor();
                     } catch (IOException e) {
                         return 1l;
                     }
@@ -301,12 +338,12 @@ public class MainActivity extends AppCompatActivity
                 case "backward":
                     if (ev3 == null)
                         return 2l;
-                    pilot.forward();
+                    pilot.backward();
                     break;
                 case "forward":
                     if (ev3 == null)
                         return 2l;
-                    pilot.backward();
+                    pilot.forward();
                     break;
                 case "stop":
                     if (ev3 == null)
@@ -327,6 +364,26 @@ public class MainActivity extends AppCompatActivity
                     pilot.stop();
                     ev3.disConnect();
                     break;
+                case "color":
+                    if (ev3 == null)
+                        return 2l;
+                        stop1 = false;
+                        do {
+                            int theColor = cSensor.getColorID();
+                            System.out.println("My color is " + theColor);
+                            Delay.msDelay(200);
+                        } while (!stop1);
+                        stop1 = false;
+                case "distance":
+                    if (ev3 == null)
+                        return 2l;
+                    stop2 = false;
+                        do {
+                            Double theDistance = getAccurateDistance();
+                            System.out.println("My distance is " + theDistance);
+                            Delay.msDelay(200);
+                        } while (!stop2);
+                        stop2 = false;
             }
             return 0l;
         }
