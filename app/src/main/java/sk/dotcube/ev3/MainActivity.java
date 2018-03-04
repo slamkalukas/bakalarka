@@ -199,7 +199,6 @@ public class MainActivity extends AppCompatActivity
             }
             break;
         }
-        System.out.println(average);
         return average;
     }
 
@@ -379,7 +378,7 @@ public class MainActivity extends AppCompatActivity
                         return 2l;
                     stop2 = false;
                         do {
-                            Double theDistance = getAccurateDistance();
+                            Float theDistance = getOneDistance();
                             System.out.println("My distance is " + theDistance);
                             Delay.msDelay(200);
                         } while (!stop2);
