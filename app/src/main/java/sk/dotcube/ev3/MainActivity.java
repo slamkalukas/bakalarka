@@ -30,6 +30,7 @@ import lejos.hardware.sensor.EV3ColorSensor;
 import lejos.hardware.sensor.EV3UltrasonicSensor;
 import lejos.remote.ev3.RemoteRequestEV3;
 import lejos.remote.ev3.RemoteRequestPilot;
+import lejos.robotics.Color;
 import lejos.robotics.SampleProvider;
 import lejos.utility.Delay;
 
@@ -44,13 +45,13 @@ public class MainActivity extends AppCompatActivity
     private Sensor mTouch;
     private float x = 0, y = 0, z = 0;
     private SampleProvider colourSP, ultrasonicDistSP;
-    private TextView xAccel, yAccel, zAccel;
+    private TextView colorText, distanceText;
     private RemoteRequestEV3 evBrick;
     private EV3ColorSensor cSensor;
     private float[] colourSample, ultrasonicDistSample;
     private int colourData = 0;
     private Button connButton1,connButton2;
-    private Boolean stop1,stop2 = false;
+    private Boolean stop1 = false ,stop2 = false;
     private EV3UltrasonicSensor uSensor;
     private static final int SCAN_DELAY = 70;
     private static final int REPEAT_SCAN_TIMES = 20;
@@ -76,10 +77,6 @@ public class MainActivity extends AppCompatActivity
         sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
         mTouch = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
-        xAccel = (TextView) findViewById(R.id.xAccel);
-        yAccel = (TextView) findViewById(R.id.yAccel);
-        zAccel = (TextView) findViewById(R.id.zAccel);
-
         //EV3 code part
 
         forward = (ImageButton) findViewById(R.id.btnForward);
@@ -93,6 +90,9 @@ public class MainActivity extends AppCompatActivity
 
         right = (ImageButton) findViewById(R.id.btnRight);
         right.setOnTouchListener(this);
+
+        colorText = (TextView) findViewById(R.id.ColorText);
+        distanceText = (TextView) findViewById(R.id.DistanceText);
 
         new Control().execute("connect", HOST);
 
@@ -123,6 +123,14 @@ public class MainActivity extends AppCompatActivity
             public boolean onLongClick(View v) {
                 stop2 = true;
                 return true;
+            }
+        });
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+
+
             }
         });
     }
@@ -176,32 +184,6 @@ public class MainActivity extends AppCompatActivity
         return distance;
     }
 
-    // get a stable and accruate distance
-    private double getAccurateDistance() {
-        double average = 0;
-        while (true) {
-            // get a set of data by scanning and compute an average
-            average = 0;
-            float[] distances = new float[REPEAT_SCAN_TIMES];
-            for (int i = 0; i <= REPEAT_SCAN_TIMES - 1; i++) {
-                distances[i] = getOneDistance();
-                average += distances[i] / REPEAT_SCAN_TIMES;
-            }
-            // if each distance we got is close to the average, then this set of
-            // data is reliable
-            // if any distance in the data set is very different from the
-            // average, then this set
-            // of data will be considered unreliable and will be scanned again
-            for (int i = 0; i <= REPEAT_SCAN_TIMES - 1; i++) {
-                if (Math.abs(average - distances[i]) > SCAN_STABLE_THRESHOLD) {
-                    continue;
-                }
-            }
-            break;
-        }
-        return average;
-    }
-
     @SuppressWarnings("StatementWithEmptyBody")
     @Override
     public boolean onNavigationItemSelected(MenuItem item) {
@@ -246,14 +228,14 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onDestroy() {
         super.onDestroy();
-        new Control().execute("close", HOST);
+        new Control().execute("close");
         Toast.makeText(MainActivity.this, "Disconnecting…",
                 Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        synchronized (this) {
+        /*synchronized (this) {
             if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
                 x = event.values[0];
                 y = event.values[1];
@@ -264,7 +246,7 @@ public class MainActivity extends AppCompatActivity
             } else {
                 xAccel.setText("NEFUNGUJE!");
             }
-        }
+        }*/
     }
 
     @Override
@@ -307,7 +289,62 @@ public class MainActivity extends AppCompatActivity
         float r = colorData[0];
         float g = colorData[1];
         float b = colorData[2];
-        return "r " + r*100 + " g " + g*100 + " b " +b*100;
+        String rf = String.format("%.2f", r*100);
+        String gf = String.format("%.2f", g*100);
+        String bf = String.format("%.2f", b*100);
+        return "r" + rf + " g" + gf + " b" + bf;
+    }
+
+    private String convertColor(int colorId) {
+        String color = "";
+        switch(colorId) {
+            case Color.NONE:
+                color = "none";
+            break;
+            case Color.BLACK:
+                color = "BLACK";
+            break;
+            case Color.BLUE:
+                color =  "BLUE";
+            break;
+            case Color.BROWN:
+                color =  "BROWN";
+            break;
+            case Color.CYAN:
+                color =  "CYAN";
+            break;
+            case Color.DARK_GRAY:
+                color =  "DARK GRAY";
+            break;
+            case Color.GRAY:
+                color =  "GRAY";
+            break;
+            case Color.GREEN:
+                color =  "GREEN";
+            break;
+            case Color.LIGHT_GRAY:
+                color =  "LIGHT GRAY";
+            break;
+            case Color.MAGENTA:
+                color =  "MAGENTA";
+            break;
+            case Color.ORANGE:
+                color =  "ORANGE";
+            break;
+            case Color.PINK:
+                color =  "PINK";
+            break;
+            case Color.RED:
+                color =  "RED";
+            break;
+            case Color.WHITE:
+                color =  "WHITE";
+            break;
+            case Color.YELLOW:
+                color =  "YELLOW";
+            break;
+        }
+        return color;
     }
 
     public class Control extends AsyncTask<String, Integer, Long> {
@@ -317,7 +354,7 @@ public class MainActivity extends AppCompatActivity
                     try {
                         ev3 = new RemoteRequestEV3(cmd[1]);
                         pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f, "B", "C");
-                        pilot.setLinearSpeed(30f);
+                        pilot.setLinearSpeed(20f);
                         setupColorSensor();
                         setupUltrasonicSensor();
                     } catch (IOException e) {
@@ -347,6 +384,8 @@ public class MainActivity extends AppCompatActivity
                 case "stop":
                     if (ev3 == null)
                         return 2l;
+                    stop1 = true;
+                    stop2 = true;
                     pilot.stop();
                     break;
                 case "bump":
@@ -361,6 +400,8 @@ public class MainActivity extends AppCompatActivity
                     if (ev3 == null)
                         return 2l;
                     pilot.stop();
+                    uSensor.close();
+                    cSensor.close();
                     ev3.disConnect();
                     break;
                 case "color":
@@ -369,20 +410,33 @@ public class MainActivity extends AppCompatActivity
                         stop1 = false;
                         do {
                             int theColor = cSensor.getColorID();
+                            final String color = convertColor(theColor);
                             System.out.println("My color is " + theColor);
+                            runOnUiThread(new Runnable() {
+                                  public void run() {
+                                      colorText.setText(color);}
+                              });
                             Delay.msDelay(200);
                         } while (!stop1);
                         stop1 = false;
+                        break;
                 case "distance":
                     if (ev3 == null)
                         return 2l;
-                    stop2 = false;
+                        stop2 = false;
                         do {
                             Float theDistance = getOneDistance();
-                            System.out.println("My distance is " + theDistance);
+                            final String distance = String.format("%.0f", theDistance*10);
+                            System.out.println("My distance is " + distance);
+                            runOnUiThread(new Runnable() {
+                                  public void run() {
+                                      distanceText.setText(distance + " cm");
+                                  }
+                              });
                             Delay.msDelay(200);
                         } while (!stop2);
                         stop2 = false;
+                        break;
             }
             return 0l;
         }
