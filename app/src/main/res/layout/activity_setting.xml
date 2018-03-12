@@ -8,14 +8,83 @@
 
     <EditText
         android:id="@+id/EV3IPAddress"
-        android:layout_width="359dp"
-        android:layout_height="41dp"
-        android:layout_marginLeft="13dp"
-        android:layout_marginTop="8dp"
+        android:layout_width="143dp"
+        android:layout_height="42dp"
+        android:layout_marginLeft="4dp"
+        android:layout_marginStart="60dp"
+        android:layout_marginTop="16dp"
         android:contentDescription="IP address of EV3"
         android:ems="10"
         android:inputType="text"
-        android:text="10.40.50.31"
+        android:text="10.40.50.30"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/ipAddress2"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <Button
+        android:id="@+id/button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="268dp"
+        android:layout_marginTop="64dp"
+        android:text="Ulozit"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/motorLeft" />
+
+    <TextView
+        android:id="@+id/ipAddress"
+        android:layout_width="wrap_content"
+        android:layout_height="20dp"
+        android:layout_marginLeft="32dp"
+        android:layout_marginTop="44dp"
+        android:text="Motor Right"
+        app:layout_constraintEnd_toEndOf="@+id/ipAddress2"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/ipAddress3" />
+
+    <TextView
+        android:id="@+id/ipAddress3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="32dp"
+        android:layout_marginTop="44dp"
+        android:text="Motor Left"
+        app:layout_constraintEnd_toEndOf="@+id/ipAddress2"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/ipAddress2" />
+
+    <TextView
+        android:id="@+id/ipAddress2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="32dp"
+        android:layout_marginTop="16dp"
+        android:text="IP Address"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <EditText
+        android:id="@+id/motorRight"
+        android:layout_width="139dp"
+        android:layout_height="43dp"
+        android:layout_marginStart="56dp"
+        android:layout_marginTop="20dp"
+        android:ems="10"
+        android:inputType="textCapCharacters"
+        android:text="C"
+        app:layout_constraintStart_toEndOf="@+id/ipAddress"
+        app:layout_constraintTop_toBottomOf="@+id/motorLeft" />
+
+    <EditText
+        android:id="@+id/motorLeft"
+        android:layout_width="139dp"
+        android:layout_height="43dp"
+        android:layout_marginStart="60dp"
+        android:layout_marginTop="20dp"
+        android:ems="10"
+        android:inputType="textCapCharacters"
+        android:text="B"
+        app:layout_constraintStart_toEndOf="@+id/ipAddress3"
+        app:layout_constraintTop_toBottomOf="@+id/EV3IPAddress" />
+
 </android.support.constraint.ConstraintLayout>

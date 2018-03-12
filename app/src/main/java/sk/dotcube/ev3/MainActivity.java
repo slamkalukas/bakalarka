@@ -24,21 +24,18 @@ import android.widget.Toast;
 
 import java.io.IOException;
 
-import lejos.hardware.Keys;
-import lejos.hardware.motor.Motor;
 import lejos.hardware.sensor.EV3ColorSensor;
 import lejos.hardware.sensor.EV3UltrasonicSensor;
 import lejos.remote.ev3.RemoteRequestEV3;
 import lejos.remote.ev3.RemoteRequestPilot;
 import lejos.robotics.Color;
 import lejos.robotics.SampleProvider;
-import lejos.utility.Delay;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, OnTouchListener, SensorEventListener {
 
     private ImageButton forward, backward, left, right;
-    public static final String HOST = "10.40.50.30";
+    public String HOST, MOTOR_LEFT, MOTOR_RIGHT, ULTRASONIC_PORT, COLOR_PORT;
     private RemoteRequestEV3 ev3;
     private RemoteRequestPilot pilot;
     private SensorManager sensorManager;
@@ -46,17 +43,11 @@ public class MainActivity extends AppCompatActivity
     private float x = 0, y = 0, z = 0;
     private SampleProvider colourSP, ultrasonicDistSP;
     private TextView colorText, distanceText;
-    private RemoteRequestEV3 evBrick;
     private EV3ColorSensor cSensor;
     private float[] colourSample, ultrasonicDistSample;
-    private int colourData = 0;
-    private Button connButton1,connButton2;
-    private Boolean stop1 = false ,stop2 = false;
+    private Button colorButton, distanceButton, connectButton, disconnectButton;
     private EV3UltrasonicSensor uSensor;
     private static final int SCAN_DELAY = 70;
-    private static final int REPEAT_SCAN_TIMES = 20;
-    private static final double SCAN_STABLE_THRESHOLD = 0.5;
-    private static final float OCCUPIED_THRESHOLD = 30;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,8 +68,6 @@ public class MainActivity extends AppCompatActivity
         sensorManager = (SensorManager)getSystemService(SENSOR_SERVICE);
         mTouch = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
 
-        //EV3 code part
-
         forward = (ImageButton) findViewById(R.id.btnForward);
         forward.setOnTouchListener(this);
 
@@ -94,43 +83,47 @@ public class MainActivity extends AppCompatActivity
         colorText = (TextView) findViewById(R.id.ColorText);
         distanceText = (TextView) findViewById(R.id.DistanceText);
 
-        new Control().execute("connect", HOST);
+        HOST = "10.40.50.30";
+        MOTOR_LEFT = "B";
+        MOTOR_RIGHT = "C";
+        ULTRASONIC_PORT = "S4";
+        COLOR_PORT = "S1";
 
-        connButton1 = (Button) findViewById(R.id.Color);
-        connButton1.setOnClickListener( new View.OnClickListener() {
+        /*HOST = Preferences.readString(getApplicationContext(),Preferences.IP,"10.40.50.30");
+        MOTOR_LEFT = Preferences.readString(getApplicationContext(),Preferences.MOTOR_LEFT,"B");
+        MOTOR_RIGHT = Preferences.readString(getApplicationContext(),Preferences.MOTOR_RIGHT,"C");
+        ULTRASONIC_PORT = Preferences.readString(getApplicationContext(),Preferences.ULTRASONIC_PORT,"S4");
+        COLOR_PORT = Preferences.readString(getApplicationContext(),Preferences.COLOR_PORT,"S1");*/
+
+        colorButton = (Button) findViewById(R.id.Color);
+        colorButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 new Control().execute("color");
             }
         });
-        connButton1.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                stop1 = true;
-                return true;
-            }
-        });
 
-        connButton2 = (Button) findViewById(R.id.Distance);
-        connButton2.setOnClickListener( new View.OnClickListener() {
+        distanceButton = (Button) findViewById(R.id.Distance);
+        distanceButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 new Control().execute("distance");
             }
         });
-        connButton2.setOnLongClickListener(new View.OnLongClickListener() {
+
+        connectButton = (Button) findViewById(R.id.Connect);
+        connectButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public boolean onLongClick(View v) {
-                stop2 = true;
-                return true;
+            public void onClick(View v) {
+                new Control().execute("connect", HOST);
             }
         });
 
-        runOnUiThread(new Runnable() {
+        disconnectButton = (Button) findViewById(R.id.Disconnect);
+        disconnectButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void run() {
-
-
+            public void onClick(View v) {
+                new Control().execute("close");
             }
         });
     }
@@ -256,7 +249,7 @@ public class MainActivity extends AppCompatActivity
 
     private void setupColorSensor() {
         try {
-            cSensor = new EV3ColorSensor(ev3.getPort("S1"));
+            cSensor = new EV3ColorSensor(ev3.getPort(COLOR_PORT));
             colourSP = cSensor.getRGBMode();
             colourSample = new float[colourSP.sampleSize()];
         } catch (Exception e)
@@ -267,7 +260,7 @@ public class MainActivity extends AppCompatActivity
 
     private void setupUltrasonicSensor() {
         try {
-            uSensor = new EV3UltrasonicSensor(ev3.getPort("S4"));
+            uSensor = new EV3UltrasonicSensor(ev3.getPort(ULTRASONIC_PORT));
             ultrasonicDistSP = uSensor.getDistanceMode();
             ultrasonicDistSample = new float[ultrasonicDistSP.sampleSize()];
         } catch (Exception e)
@@ -295,56 +288,39 @@ public class MainActivity extends AppCompatActivity
         return "r" + rf + " g" + gf + " b" + bf;
     }
 
-    private String convertColor(int colorId) {
-        String color = "";
-        switch(colorId) {
-            case Color.NONE:
-                color = "none";
-            break;
+    public static String convertColorToString(int colorID) {
+        switch (colorID) {
             case Color.BLACK:
-                color = "BLACK";
-            break;
+                return "Black";
             case Color.BLUE:
-                color =  "BLUE";
-            break;
-            case Color.BROWN:
-                color =  "BROWN";
-            break;
+                return "Blue";
             case Color.CYAN:
-                color =  "CYAN";
-            break;
+                return "Cyan";
             case Color.DARK_GRAY:
-                color =  "DARK GRAY";
-            break;
+                return "Dark Gray";
             case Color.GRAY:
-                color =  "GRAY";
-            break;
+                return "Gray";
             case Color.GREEN:
-                color =  "GREEN";
-            break;
+                return "Green";
             case Color.LIGHT_GRAY:
-                color =  "LIGHT GRAY";
-            break;
+                return "Light Gray";
             case Color.MAGENTA:
-                color =  "MAGENTA";
-            break;
+                return "Magenta";
+            case Color.NONE:
+                return "No Color";
             case Color.ORANGE:
-                color =  "ORANGE";
-            break;
+                return "Orange";
             case Color.PINK:
-                color =  "PINK";
-            break;
+                return "Pink";
             case Color.RED:
-                color =  "RED";
-            break;
+                return "Red";
             case Color.WHITE:
-                color =  "WHITE";
-            break;
+                return "White";
             case Color.YELLOW:
-                color =  "YELLOW";
-            break;
+                return "Yellow";
+            default:
+                return "No Color";
         }
-        return color;
     }
 
     public class Control extends AsyncTask<String, Integer, Long> {
@@ -353,8 +329,8 @@ public class MainActivity extends AppCompatActivity
                 case "connect":
                     try {
                         ev3 = new RemoteRequestEV3(cmd[1]);
-                        pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f, "B", "C");
-                        pilot.setLinearSpeed(20f);
+                        pilot = (RemoteRequestPilot) ev3.createPilot(3.5f, 20f, MOTOR_LEFT, MOTOR_RIGHT);
+                        pilot.setLinearSpeed(40f);
                         setupColorSensor();
                         setupUltrasonicSensor();
                     } catch (IOException e) {
@@ -384,8 +360,6 @@ public class MainActivity extends AppCompatActivity
                 case "stop":
                     if (ev3 == null)
                         return 2l;
-                    stop1 = true;
-                    stop2 = true;
                     pilot.stop();
                     break;
                 case "bump":
@@ -407,35 +381,25 @@ public class MainActivity extends AppCompatActivity
                 case "color":
                     if (ev3 == null)
                         return 2l;
-                        stop1 = false;
-                        do {
-                            int theColor = cSensor.getColorID();
-                            final String color = convertColor(theColor);
-                            System.out.println("My color is " + theColor);
-                            runOnUiThread(new Runnable() {
-                                  public void run() {
-                                      colorText.setText(color);}
-                              });
-                            Delay.msDelay(200);
-                        } while (!stop1);
-                        stop1 = false;
+                        int theColor = cSensor.getColorID();
+                        final String color = convertColorToString(theColor);
+                        System.out.println("My color is " + theColor);
+                        runOnUiThread(new Runnable() {
+                              public void run() {
+                                  colorText.setText(color);}
+                          });
                         break;
                 case "distance":
                     if (ev3 == null)
                         return 2l;
-                        stop2 = false;
-                        do {
-                            Float theDistance = getOneDistance();
-                            final String distance = String.format("%.0f", theDistance*10);
-                            System.out.println("My distance is " + distance);
-                            runOnUiThread(new Runnable() {
-                                  public void run() {
-                                      distanceText.setText(distance + " cm");
-                                  }
-                              });
-                            Delay.msDelay(200);
-                        } while (!stop2);
-                        stop2 = false;
+                        Float theDistance = getOneDistance();
+                        final String distance = String.format("%.0f", theDistance*10);
+                        System.out.println("My distance is " + distance);
+                        runOnUiThread(new Runnable() {
+                              public void run() {
+                                  distanceText.setText(distance + " cm");
+                              }
+                          });
                         break;
             }
             return 0l;

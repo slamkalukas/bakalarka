@@ -78,10 +78,19 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
-        android:id="@+id/Stop"
+        android:id="@+id/Disconnect"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Stop"
+        android:text="Disconnect"
+        app:layout_constraintStart_toEndOf="@+id/Connect"
+        tools:layout_editor_absoluteY="0dp"
+        app:layout_constraintTop_toTopOf="parent"/>
+
+    <Button
+        android:id="@+id/Connect"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Connect"
         app:layout_constraintStart_toEndOf="@+id/Color"
         app:layout_constraintTop_toTopOf="parent" />
 
